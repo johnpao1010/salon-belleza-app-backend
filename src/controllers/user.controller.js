@@ -181,6 +181,60 @@ const reactivateUser = async (req, res, next) => {
   }
 };
 
+/**
+ * Get current user's profile
+ */
+const getMe = async (req, res, next) => {
+  try {
+    // El usuario ya está disponible en req.user gracias al middleware de autenticación
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ['password'] }
+    });
+
+    if (!user) {
+      throw new AppError('No user found with that ID', 404);
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        user
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update current user's password
+ */
+const updatePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findByPk(req.user.id);
+
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    // Verificar la contraseña actual
+    if (!(await user.validatePassword(currentPassword))) {
+      throw new AppError('Current password is incorrect', 401);
+    }
+
+    // Actualizar la contraseña
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Password updated successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 module.exports = {
   getAllUsers,
   getUser,
@@ -188,4 +242,6 @@ module.exports = {
   deleteUser,
   deactivateUser,
   reactivateUser,
+  getMe,
+  updatePassword,
 };
