@@ -17,7 +17,7 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const serviceRoutes = require('./routes/service.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
-
+const authController = require('./controllers/auth.controller');
 // Import error handling middleware
 const globalErrorHandler = require('./middlewares/error.middleware');
 
@@ -60,6 +60,7 @@ testConnection()
 
 // Routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/auth/me', authController.getMe);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/services', serviceRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);
