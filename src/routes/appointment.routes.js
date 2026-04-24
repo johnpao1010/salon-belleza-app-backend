@@ -12,6 +12,7 @@ router.use(authenticate);
 // Appointment routes
 router.post('/', appointmentController.createAppointment);
 router.get('/', appointmentController.getAllAppointments);
+router.get('/employee', appointmentController.getEmployeeAppointments);
 router.get('/:id', appointmentController.getAppointment);
 router.patch('/:id', appointmentController.updateAppointment);
 router.delete('/:id/cancel', appointmentController.cancelAppointment);

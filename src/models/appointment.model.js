@@ -19,11 +19,19 @@ class Appointment extends BaseModel {
   static associate(models) {
     this.belongsTo(models.User, {
       foreignKey: 'user_id',
+      targetKey: 'id',
       as: 'user',
+    });
+
+    this.belongsTo(models.User, {
+      foreignKey: 'employee_id',
+      targetKey: 'id',
+      as: 'employee',
     });
 
     this.belongsTo(models.Service, {
       foreignKey: 'service_id',
+      targetKey: 'id',
       as: 'service',
     });
   }
@@ -40,6 +48,16 @@ class Appointment extends BaseModel {
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE',
       },
+      employee_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+          model: 'users', // This is the table name
+          key: 'id',
+        },
+        onUpdate: 'CASCADE',
+        onDelete: 'RESTRICT',
+      },
       service_id: {
         type: DataTypes.UUID,
         allowNull: false,
@@ -55,21 +73,20 @@ class Appointment extends BaseModel {
         allowNull: false,
         validate: {
           isDate: true,
-          isAfter: new Date().toISOString().split('T')[0], // Must be in the future
         },
       },
       start_time: {
         type: DataTypes.TIME,
         allowNull: false,
         validate: {
-          isTimeString: true,
+          is: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, // HH:MM format
         },
       },
       end_time: {
         type: DataTypes.TIME,
         allowNull: false,
         validate: {
-          isTimeString: true,
+          is: /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, // HH:MM format
         },
       },
       status: {

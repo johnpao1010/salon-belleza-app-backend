@@ -371,6 +371,63 @@ const updatePassword = async (req, res, next) => {
     next(error);
   }
 };
+/**
+ * Get users by role (accessible by authenticated users)
+ * Query params:
+ * - role: Role to filter by (required)
+ * - active: Filter by active status (true/false)
+ * - search: Search in name and email
+ */
+const getUsersByRole = async (req, res, next) => {
+  try {
+    const { role, active, search } = req.query;
+
+    if (!role) {
+      throw new AppError('Role parameter is required', 400);
+    }
+
+    // Build where clause
+    const where = { role };
+
+    // Filter by active status
+    if (active !== undefined) {
+      where.is_active = active === 'true';
+    }
+
+    // Search in name and email
+    if (search) {
+      where[Op.or] = [
+        { first_name: { [Op.iLike]: `%${search}%` } },
+        { last_name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const users = await User.findAll({
+      where,
+      attributes: { 
+        exclude: [
+          'password', 
+          'password_reset_token', 
+          'password_reset_expires',
+          'verification_token',
+        ]
+      },
+      order: [['first_name', 'ASC'], ['last_name', 'ASC']],
+    });
+
+    res.status(200).json({
+      status: 'success',
+      results: users.length,
+      data: {
+        users,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   getUser,
@@ -380,4 +437,5 @@ module.exports = {
   reactivateUser,
   getMe,
   updatePassword,
+  getUsersByRole,
 };

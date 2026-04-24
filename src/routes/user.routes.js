@@ -11,6 +11,9 @@ router.get('/profile', userController.getMe);
 router.patch('/profile', userController.updateUser);
 router.patch('/update-password', userController.updatePassword);
 
+// Get users by role (accessible by authenticated users)
+router.get('/by-role', userController.getUsersByRole);
+
 // Admin-only routes
 router.use(authorize('admin'));
 

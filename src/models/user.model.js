@@ -29,6 +29,11 @@ class User extends BaseModel {
       foreignKey: 'user_id',
       as: 'appointments',
     });
+    
+    this.hasMany(models.Appointment, {
+      foreignKey: 'employee_id',
+      as: 'employeeAppointments',
+    });
   }
 
   // Instance method to validate password
@@ -81,7 +86,7 @@ class User extends BaseModel {
         },
       },
       role: {
-        type: DataTypes.ENUM('admin', 'user'),
+        type: DataTypes.ENUM('admin', 'user', 'employee'),
         defaultValue: 'user',
         allowNull: false,
       },

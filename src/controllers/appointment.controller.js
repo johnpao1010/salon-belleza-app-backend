@@ -5,9 +5,10 @@ const AppError = require('../utils/AppError');
 /**
  * Helper function to check if a time slot is available
  */
-const isTimeSlotAvailable = async (serviceId, date, startTime, endTime, excludeAppointmentId = null) => {
+const isTimeSlotAvailable = async (serviceId, employeeId, date, startTime, endTime, excludeAppointmentId = null) => {
   const conditions = {
     service_id: serviceId,
+    employee_id: employeeId,
     appointment_date: date,
     status: 'scheduled',
     [Op.or]: [
@@ -37,24 +38,31 @@ const isTimeSlotAvailable = async (serviceId, date, startTime, endTime, excludeA
  */
 const createAppointment = async (req, res, next) => {
   try {
-    const { service_id, appointment_date, start_time, notes } = req.body;
+    const { serviceId, employeeId, appointmentDate, startTime, notes } = req.body;
     const userId = req.user.id;
 
+    // Validate employee
+    const employee = await User.findByPk(employeeId);
+    if (!employee || !employee.is_active || employee.role !== 'employee') {
+      throw new AppError('Employee not found or not available', 404);
+    }
+
     // Get the service to check duration and other details
-    const service = await Service.findByPk(service_id);
+    const service = await Service.findByPk(serviceId);
     if (!service || !service.is_active) {
       throw new AppError('Service not found or not available', 404);
     }
 
     // Parse and validate the appointment date and time
-    const appointmentDate = new Date(appointment_date);
-    if (isNaN(appointmentDate.getTime())) {
+    const [year, month, day] = appointmentDate.split('-').map(Number);
+    const appointment_Date = new Date(year, month - 1, day); // month-1 porque JS usa 0-11
+    if (isNaN(appointment_Date.getTime())) {
       throw new AppError('Invalid appointment date', 400);
     }
 
     // Parse start time
-    const [startHours, startMinutes] = start_time.split(':').map(Number);
-    const startDateTime = new Date(appointmentDate);
+    const [startHours, startMinutes] = startTime.split(':').map(Number);
+    const startDateTime = new Date(appointment_Date);
     startDateTime.setHours(startHours, startMinutes, 0, 0);
 
     // Calculate end time based on service duration
@@ -75,9 +83,10 @@ const createAppointment = async (req, res, next) => {
 
     // Check if the time slot is available
     const isAvailable = await isTimeSlotAvailable(
-      service_id,
-      appointment_date,
-      start_time,
+      serviceId,
+      employeeId,
+      appointment_Date,
+      startTime,
       end_time
     );
 
@@ -88,19 +97,21 @@ const createAppointment = async (req, res, next) => {
     // Create the appointment
     const appointment = await Appointment.create({
       user_id: userId,
-      service_id,
-      appointment_date,
-      start_time,
+      employee_id: employeeId,
+      service_id: serviceId,
+      appointment_date: appointment_Date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+      start_time: startTime,
       end_time,
       status: 'scheduled',
       notes,
     });
 
-    // Include service and user details in the response
+    // Include service, user and employee details in the response
     const appointmentWithDetails = await Appointment.findByPk(appointment.id, {
       include: [
         { model: Service, as: 'service' },
         { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
+        { model: User, as: 'employee', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
       ],
     });
 
@@ -159,6 +170,7 @@ const getAllAppointments = async (req, res, next) => {
       include: [
         { model: Service, as: 'service' },
         { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
+        { model: User, as: 'employee', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
       ],
       order: [
         ['appointment_date', 'ASC'],
@@ -198,6 +210,7 @@ const getAppointment = async (req, res, next) => {
       include: [
         { model: Service, as: 'service' },
         { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
+        { model: User, as: 'employee', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
       ],
     });
 
@@ -222,7 +235,7 @@ const getAppointment = async (req, res, next) => {
 const updateAppointment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { service_id, appointment_date, start_time, status, notes } = req.body;
+    const { service_id, employee_id, appointment_date, start_time, status, notes } = req.body;
     const isAdmin = req.user.role === 'admin';
 
     // Find the appointment
@@ -230,6 +243,7 @@ const updateAppointment = async (req, res, next) => {
       include: [
         { model: Service, as: 'service' },
         { model: User, as: 'user' },
+        { model: User, as: 'employee' },
       ],
     });
 
@@ -240,6 +254,15 @@ const updateAppointment = async (req, res, next) => {
     // Check permissions
     if (!isAdmin && appointment.user_id !== req.user.id) {
       throw new AppError('You do not have permission to update this appointment', 403);
+    }
+
+    // If updating employee, validate it
+    if (employee_id) {
+      const employee = await User.findByPk(employee_id);
+      if (!employee || !employee.is_active || employee.role !== 'employee') {
+        throw new AppError('Employee not found or not available', 404);
+      }
+      appointment.employee_id = employee_id;
     }
 
     // If updating time/date, check availability
@@ -254,6 +277,7 @@ const updateAppointment = async (req, res, next) => {
 
       const date = appointment_date || appointment.appointment_date;
       const startTime = start_time || appointment.start_time;
+      const currentEmployeeId = employee_id || appointment.employee_id;
       
       // Calculate end time based on service duration
       const [hours, minutes] = startTime.split(':').map(Number);
@@ -265,6 +289,7 @@ const updateAppointment = async (req, res, next) => {
       // Check if the time slot is available (excluding the current appointment)
       const isAvailable = await isTimeSlotAvailable(
         service.id,
+        currentEmployeeId,
         date,
         startTime,
         endTime,
@@ -299,6 +324,7 @@ const updateAppointment = async (req, res, next) => {
       include: [
         { model: Service, as: 'service' },
         { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
+        { model: User, as: 'employee', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
       ],
     });
 
@@ -355,10 +381,18 @@ const cancelAppointment = async (req, res, next) => {
  */
 const getAvailableSlots = async (req, res, next) => {
   try {
-    const { service_id, date } = req.query;
+    const { service_id, employee_id, date } = req.query;
 
     if (!service_id || !date) {
       throw new AppError('Service ID and date are required', 400);
+    }
+
+    // Validate employee if provided
+    if (employee_id) {
+      const employee = await User.findByPk(employee_id);
+      if (!employee || !employee.is_active || employee.role !== 'employee') {
+        throw new AppError('Employee not found or not available', 404);
+      }
     }
 
     // Get the service to determine duration
@@ -379,13 +413,19 @@ const getAvailableSlots = async (req, res, next) => {
       end: 19,   // 7 PM
     };
 
-    // Get all appointments for the service on the given date
+    // Get all appointments for the service and employee on the given date
+    const whereConditions = {
+      service_id,
+      appointment_date: date,
+      status: 'scheduled',
+    };
+    
+    if (employee_id) {
+      whereConditions.employee_id = employee_id;
+    }
+
     const appointments = await Appointment.findAll({
-      where: {
-        service_id,
-        appointment_date: date,
-        status: 'scheduled',
-      },
+      where: whereConditions,
       order: [['start_time', 'ASC']],
     });
 
@@ -432,6 +472,7 @@ const getAvailableSlots = async (req, res, next) => {
       // Check if the slot is available
       const isAvailable = await isTimeSlotAvailable(
         service_id,
+        employee_id,
         date,
         slot.start_time,
         slot.end_time
@@ -465,6 +506,89 @@ const getAvailableSlots = async (req, res, next) => {
   }
 };
 
+/**
+ * Get appointments for a specific employee
+ * Query params:
+ * - employee_id: Employee ID (required)
+ * - start_date: Filter by start date
+ * - end_date: Filter by end date
+ * - status: Filter by status
+ * - page: Page number (default: 1)
+ * - limit: Number of results per page (default: 10)
+ */
+const getEmployeeAppointments = async (req, res, next) => {
+  try {
+    const { employee_id, start_date, end_date, status } = req.query;
+    const isAdmin = req.user.role === 'admin';
+
+    if (!employee_id) {
+      throw new AppError('Employee ID is required', 400);
+    }
+
+    // Validate that the employee exists and is actually an employee
+    const employee = await User.findByPk(employee_id);
+    if (!employee || !employee.is_active || employee.role !== 'employee') {
+      throw new AppError('Employee not found or not available', 404);
+    }
+
+    // Build where clause
+    const where = { employee_id };
+
+    // Filter by date range
+    if (start_date && end_date) {
+      where.appointment_date = {
+        [Op.between]: [start_date, end_date],
+      };
+    } else if (start_date) {
+      where.appointment_date = { [Op.gte]: start_date };
+    } else if (end_date) {
+      where.appointment_date = { [Op.lte]: end_date };
+    }
+
+    // Filter by status
+    if (status) {
+      where.status = status;
+    }
+
+    // Non-admins can only see their own appointments
+    if (!isAdmin && req.user.role === 'employee') {
+      // Employees can only see their own appointments
+      if (employee_id !== req.user.id) {
+        throw new AppError('You can only view your own appointments', 403);
+      }
+    }
+
+    const appointments = await Appointment.findAll({
+      where,
+      include: [
+        { model: Service, as: 'service' },
+        { model: User, as: 'user', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
+        { model: User, as: 'employee', attributes: ['id', 'first_name', 'last_name', 'email', 'phone'] },
+      ],
+      order: [
+        ['appointment_date', 'ASC'],
+        ['start_time', 'ASC'],
+      ],
+    });
+
+    res.status(200).json({
+      status: 'success',
+      results: appointments.length,
+      data: {
+        appointments,
+        employee: {
+          id: employee.id,
+          first_name: employee.first_name,
+          last_name: employee.last_name,
+          email: employee.email,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createAppointment,
   getAllAppointments,
@@ -472,4 +596,5 @@ module.exports = {
   updateAppointment,
   cancelAppointment,
   getAvailableSlots,
+  getEmployeeAppointments,
 };
