@@ -10,7 +10,7 @@ const AppError = require('../utils/AppError');
  */
 const register = async (req, res, next) => {
   try {
-    const { first_name, last_name, email, password, phone, role = 'user' } = req.body;
+    const { first_name, last_name, email, password, phone, role } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
