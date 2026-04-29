@@ -10,7 +10,7 @@ const AppError = require('../utils/AppError');
  */
 const register = async (req, res, next) => {
   try {
-    const { first_name, last_name, email, password, phone, role } = req.body;
+    const { first_name, last_name, email, password, phone, role = 'user' } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
@@ -25,7 +25,7 @@ const register = async (req, res, next) => {
       email,
       password,
       phone,
-      role: role === 'admin' && req.user?.role !== 'admin' ? 'user' : role, // Only admins can create other admins
+      role: role || 'user', // Use role from request or default to 'user'
     });
 
     // Generate JWT token
