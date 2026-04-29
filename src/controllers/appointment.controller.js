@@ -74,13 +74,12 @@ const createAppointment = async (req, res, next) => {
     console.log('hora actual servidor (UTC)', now);
     console.log('startDateTime', startDateTime);
     
-    // Create a comparable date for now (same date as appointment, current time)
-    const nowComparable = new Date(appointment_Date);
-    nowComparable.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
-    console.log('hora actual comparable', nowComparable);
+    // Restar 5 horas para obtener hora local (UTC-5)
+    const localNow = new Date(now.getTime() - (5 * 60 * 60 * 1000));
+    console.log('hora actual local (UTC-5)', localNow);
     
-    // Compare only the date and time components
-    if (startDateTime <= nowComparable) {
+    // Compare with local time
+    if (startDateTime <= localNow) {
       throw new AppError('Cannot book an appointment in the past', 400);
     }
 
