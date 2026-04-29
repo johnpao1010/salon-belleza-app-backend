@@ -71,6 +71,8 @@ const createAppointment = async (req, res, next) => {
 
     // Check if the time slot is in the future
     const now = new Date();
+    console.log('hora actual', now);
+    console.log('startDateTime', startDateTime);
     if (startDateTime < now) {
       throw new AppError('Cannot book an appointment in the past', 400);
     }
