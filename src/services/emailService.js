@@ -13,11 +13,41 @@ class EmailService {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
+      // Configuración para producción
+      connectionTimeout: 60000, // 60 segundos
+      greetingTimeout: 30000,   // 30 segundos
+      socketTimeout: 60000,    // 60 segundos
+      tls: {
+        rejectUnauthorized: false
+      },
+      pool: true,
+      maxConnections: 1,
+      maxMessages: 100,
+      rateDelta: 1000,
+      rateLimit: 5
     });
+  }
+
+  async verifyConnection() {
+    try {
+      await this.transporter.verify();
+      console.log('Conexión SMTP verificada exitosamente');
+      return true;
+    } catch (error) {
+      console.error('Error al verificar conexión SMTP:', error);
+      return false;
+    }
   }
 
   async sendWelcomeEmail(user) {
     try {
+      // Verificar conexión antes de enviar
+      const isConnected = await this.verifyConnection();
+      if (!isConnected) {
+        console.log('No se pudo verificar conexión SMTP, omitiendo envío de correo');
+        return;
+      }
+
       const welcomeEmail = this.getWelcomeTemplate(user);
       
       const mailOptions = {
@@ -27,8 +57,8 @@ class EmailService {
         html: welcomeEmail,
       };
 
-      await this.transporter.sendMail(mailOptions);
-      console.log(`Correo de bienvenida enviado a ${user.email}`);
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`Correo de bienvenida enviado a ${user.email}`, result.messageId);
     } catch (error) {
       console.error('Error al enviar correo de bienvenida:', error);
       // No lanzar el error para no interrumpir el registro
