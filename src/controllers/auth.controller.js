@@ -1,6 +1,7 @@
 const { User } = require('../models');
 const { generateToken } = require('../utils/jwt');
 const AppError = require('../utils/AppError');
+const emailService = require('../services/emailService');
 
 /**
  * Register a new user
@@ -34,6 +35,14 @@ const register = async (req, res, next) => {
     // Remove password from response
     const userResponse = user.get({ plain: true });
     delete userResponse.password;
+
+    // Send welcome email for 'user' role
+    if (user.role === 'user') {
+      // Enviar correo de forma asíncrona para no retrasar la respuesta
+      emailService.sendWelcomeEmail(user).catch(error => {
+        console.error('Error al enviar correo de bienvenida:', error);
+      });
+    }
 
     res.status(201).json({
       status: 'success',
