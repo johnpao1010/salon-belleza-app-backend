@@ -1,55 +1,21 @@
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
+// Configurar API key de SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
 class EmailService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: process.env.EMAIL_PORT,
-      secure: true, // true for 465 (SSL), false for other ports
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      // Configuración para producción
-      connectionTimeout: 60000, // 60 segundos
-      greetingTimeout: 30000,   // 30 segundos
-      socketTimeout: 60000,    // 60 segundos
-      tls: {
-        rejectUnauthorized: false
-      },
-      pool: true,
-      maxConnections: 1,
-      maxMessages: 100,
-      rateDelta: 1000,
-      rateLimit: 5,
-      // Forzar IPv4 y opciones de red
-      family: 4, // Forzar IPv4
-      dns: {
-        family: 4 // Forzar DNS IPv4
-      }
-    });
-  }
-
-  async verifyConnection() {
-    try {
-      await this.transporter.verify();
-      console.log('Conexión SMTP verificada exitosamente');
-      return true;
-    } catch (error) {
-      console.error('Error al verificar conexión SMTP:', error);
-      return false;
-    }
+    // SendGrid no necesita configuración de conexión compleja
+    console.log('EmailService inicializado con SendGrid');
   }
 
   async sendWelcomeEmail(user) {
     try {
-      // Verificar conexión antes de enviar
-      const isConnected = await this.verifyConnection();
-      if (!isConnected) {
-        console.log('No se pudo verificar conexión SMTP, omitiendo envío de correo');
+      if (!process.env.SENDGRID_API_KEY) {
+        console.log('SENDGRID_API_KEY no configurada, omitiendo envío de correo');
         return;
       }
 
@@ -62,10 +28,13 @@ class EmailService {
         html: welcomeEmail,
       };
 
-      const result = await this.transporter.sendMail(mailOptions);
-      console.log(`Correo de bienvenida enviado a ${user.email}`, result.messageId);
+      const result = await sgMail.send(mailOptions);
+      console.log(`Correo de bienvenida enviado a ${user.email}`, result[0].headers['x-message-id']);
     } catch (error) {
       console.error('Error al enviar correo de bienvenida:', error);
+      if (error.response) {
+        console.error('Error response from SendGrid:', error.response.body);
+      }
       // No lanzar el error para no interrumpir el registro
     }
   }
