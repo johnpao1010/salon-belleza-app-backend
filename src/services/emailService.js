@@ -8,7 +8,7 @@ class EmailService {
     this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
       port: process.env.EMAIL_PORT,
-      secure: false, // true for 465, false for other ports
+      secure: true, // true for 465 (SSL), false for other ports
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -24,7 +24,12 @@ class EmailService {
       maxConnections: 1,
       maxMessages: 100,
       rateDelta: 1000,
-      rateLimit: 5
+      rateLimit: 5,
+      // Forzar IPv4 y opciones de red
+      family: 4, // Forzar IPv4
+      dns: {
+        family: 4 // Forzar DNS IPv4
+      }
     });
   }
 
