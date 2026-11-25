@@ -84,11 +84,8 @@ module.exports = {
     }
   },
 
-  async down(queryInterface) {
-    await queryInterface.dropTable('appointments');
-    await queryInterface.dropTable('services');
-    await queryInterface.dropTable('users');
-    await queryInterface.sequelize.query('DROP TYPE IF EXISTS "enum_appointments_status"');
-    await queryInterface.sequelize.query('DROP TYPE IF EXISTS "enum_users_role"');
+  async down() {
+    // The baseline may have adopted pre-existing tables; dropping them would delete real data.
+    throw new Error('The initial schema migration cannot be reverted');
   },
 };
