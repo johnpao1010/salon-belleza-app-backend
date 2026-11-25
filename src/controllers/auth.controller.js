@@ -44,7 +44,7 @@ const register = async (req, res, next) => {
     });
 
     // Generate JWT token
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, user.role, user.password_changed_at);
 
     const userResponse = toUserResponse(user);
 
@@ -100,7 +100,7 @@ const login = async (req, res, next) => {
     await user.save();
 
     // 5) Generate JWT token
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, user.role, user.password_changed_at);
 
     // 6) Remove private fields from output
     const userResponse = toUserResponse(user);
@@ -171,7 +171,7 @@ const updatePassword = async (req, res, next) => {
     await user.save();
 
     // 4) Generate new JWT token
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, user.role, user.password_changed_at);
 
     res.status(200).json({
       status: 'success',
