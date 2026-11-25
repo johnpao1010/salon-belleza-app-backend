@@ -6,10 +6,14 @@ class Service extends BaseModel {
     return super.init(sequelize, {
       modelName: 'Service',
       tableName: 'services',
+      indexes: [
+        { unique: true, fields: ['business_id', 'name'], name: 'services_business_name' },
+      ],
     });
   }
 
   static associate(models) {
+    this.belongsTo(models.Business, { foreignKey: 'business_id', as: 'business' });
     this.hasMany(models.Appointment, {
       foreignKey: 'service_id',
       as: 'appointments',
@@ -18,10 +22,13 @@ class Service extends BaseModel {
 
   static fields(DataTypes) {
     return {
+      business_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
       name: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true,
         validate: {
           notEmpty: true,
           len: [2, 100],

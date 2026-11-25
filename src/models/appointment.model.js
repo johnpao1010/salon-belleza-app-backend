@@ -18,6 +18,7 @@ class Appointment extends BaseModel {
   }
 
   static associate(models) {
+    this.belongsTo(models.Business, { foreignKey: 'business_id', as: 'business' });
     this.belongsTo(models.User, {
       foreignKey: 'user_id',
       targetKey: 'id',
@@ -39,6 +40,10 @@ class Appointment extends BaseModel {
 
   static fields(DataTypes) {
     return {
+      business_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
       user_id: {
         type: DataTypes.UUID,
         allowNull: false,

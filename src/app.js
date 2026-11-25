@@ -23,6 +23,7 @@ const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const serviceRoutes = require('./routes/service.routes');
 const appointmentRoutes = require('./routes/appointment.routes');
+const businessRoutes = require('./routes/business.routes');
 const authController = require('./controllers/auth.controller');
 // Import error handling middleware
 const globalErrorHandler = require('./middlewares/error.middleware');
@@ -35,7 +36,7 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header(
     'Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept, Authorization'
+    'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Business-Id'
   );
   if (req.method === 'OPTIONS') {
     res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE');
@@ -70,6 +71,7 @@ app.use('/auth/me', authController.getMe);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/services', serviceRoutes);
 app.use('/api/v1/appointments', appointmentRoutes);
+app.use('/api/v1/businesses', businessRoutes);
 
 // Health check endpoint
 app.get('/api/v1/health', (req, res) => {

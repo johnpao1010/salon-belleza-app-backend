@@ -1,4 +1,4 @@
-const { User } = require('../models');
+const { BusinessMember, User } = require('../models');
 const AppError = require('../utils/AppError');
 const { Op } = require('sequelize');
 
@@ -404,8 +404,21 @@ const getUsersByRole = async (req, res, next) => {
       ];
     }
 
+    // Within a business, staff roles come from the membership, not the global user role
+    const include = [];
+    if (req.business && ['owner', 'admin', 'employee'].includes(role)) {
+      delete where.role;
+      include.push({
+        model: BusinessMember,
+        as: 'memberships',
+        where: { business_id: req.business.id, is_active: true, role },
+        attributes: ['role'],
+      });
+    }
+
     const users = await User.findAll({
       where,
+      include,
       attributes: { 
         exclude: [
           'password', 
