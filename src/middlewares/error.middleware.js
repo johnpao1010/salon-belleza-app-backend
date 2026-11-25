@@ -73,7 +73,10 @@ const globalErrorHandler = (err, req, res, next) => {
     err.status = 'fail';
   }
   err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
+  // http-errors set a numeric `status`; the API uses 'fail' / 'error'
+  if (typeof err.status !== 'string') {
+    err.status = err.statusCode < 500 ? 'fail' : 'error';
+  }
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
