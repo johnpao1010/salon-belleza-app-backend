@@ -172,83 +172,9 @@ const updatePassword = async (req, res, next) => {
   }
 };
 
-/**
- * Verify user email exists for password recovery
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
-const forgotPassword = async (req, res, next) => {
-  try {
-    const { email } = req.body;
-
-    if (!email) {
-      throw new AppError('Por favor ingresa tu correo electrónico', 400);
-    }
-
-    const user = await User.findOne({ where: { email } });
-
-    if (!user) {
-      throw new AppError('No existe una cuenta con ese correo electrónico', 404);
-    }
-
-    if (!user.is_active) {
-      throw new AppError('Tu cuenta está desactivada. Contacta al soporte.', 401);
-    }
-
-    res.status(200).json({
-      status: 'success',
-      data: {
-        message: 'Correo verificado correctamente',
-        email: user.email,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Reset user password using verified email
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- */
-const resetPassword = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      throw new AppError('Por favor ingresa el correo y la nueva contraseña', 400);
-    }
-
-    const user = await User.findOne({ where: { email } });
-
-    if (!user) {
-      throw new AppError('No existe una cuenta con ese correo electrónico', 404);
-    }
-
-    if (!user.is_active) {
-      throw new AppError('Tu cuenta está desactivada. Contacta al soporte.', 401);
-    }
-
-    user.password = password;
-    await user.save();
-
-    res.status(200).json({
-      status: 'success',
-      message: 'Contraseña actualizada correctamente',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   register,
   login,
   getMe,
   updatePassword,
-  forgotPassword,
-  resetPassword,
 };
