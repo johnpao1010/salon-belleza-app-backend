@@ -18,6 +18,11 @@ class User extends BaseModel {
           if (user.changed('password')) {
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(user.password, salt);
+            user.password_changed_at = new Date();
+          }
+          if (user.changed('email')) {
+            user.password_reset_token = null;
+            user.password_reset_expires = null;
           }
         },
       },
@@ -97,6 +102,18 @@ class User extends BaseModel {
         allowNull: false,
       },
       last_login: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      password_reset_token: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      password_reset_expires: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      password_changed_at: {
         type: DataTypes.DATE,
         allowNull: true,
       },

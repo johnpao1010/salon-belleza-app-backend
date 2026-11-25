@@ -39,6 +39,29 @@ class EmailService {
     }
   }
 
+  async sendPasswordResetEmail(user, resetUrl) {
+    if (!process.env.SENDGRID_API_KEY) {
+      console.log('SENDGRID_API_KEY no configurada, omitiendo correo de recuperación');
+      return;
+    }
+
+    try {
+      await sgMail.send({
+        from: process.env.EMAIL_FROM,
+        to: user.email,
+        subject: 'Restablece tu contraseña',
+        html: `
+          <p>Hola <strong>${user.first_name}</strong>,</p>
+          <p>Recibimos una solicitud para restablecer tu contraseña. Usa este enlace, válido por 1 hora:</p>
+          <p><a href="${resetUrl}">Restablecer contraseña</a></p>
+          <p>Si no fuiste tú, ignora este correo: tu contraseña no cambiará.</p>
+        `,
+      });
+    } catch (error) {
+      console.error('Error al enviar correo de recuperación:', error.message);
+    }
+  }
+
   getWelcomeTemplate(user) {
     return `
       <!DOCTYPE html>

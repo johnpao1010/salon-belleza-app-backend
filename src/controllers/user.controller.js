@@ -190,7 +190,13 @@ const updateUser = async (req, res, next) => {
     }
     
     // Don't allow updating password here
-    const { password, ...updateData } = updates;
+    const {
+      password,
+      password_reset_token,
+      password_reset_expires,
+      password_changed_at,
+      ...updateData
+    } = updates;
 
     // Check if user is updating their own profile or is admin
     if (user.id !== req.user.id && req.user.role !== 'admin') {
