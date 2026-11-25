@@ -210,7 +210,8 @@ const forgotPassword = async (req, res, next) => {
         await user.save({ hooks: false });
 
         const resetUrl = `${process.env.FRONTEND_URL.replace(/\/+$/, '')}/#/reset-password?token=${token}`;
-        await emailService.sendPasswordResetEmail(user, resetUrl);
+        // Not awaited so the response time does not reveal whether the account exists
+        emailService.sendPasswordResetEmail(user, resetUrl);
       }
     }
 
