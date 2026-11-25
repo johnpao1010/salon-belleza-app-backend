@@ -12,7 +12,7 @@ module.exports = {
   
   // JWT configuration
   jwt: {
-    secret: process.env.JWT_SECRET || 'your-secret-key',
+    secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRATION || '24h',
   },
   

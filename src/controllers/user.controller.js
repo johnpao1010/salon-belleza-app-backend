@@ -2,6 +2,9 @@ const { User } = require('../models');
 const AppError = require('../utils/AppError');
 const { Op } = require('sequelize');
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isUUID = (value) => typeof value === 'string' && UUID_REGEX.test(value);
+
 /**
  * Get all users (admin only)
  * Supports pagination, filtering, and sorting
@@ -98,13 +101,12 @@ const getUser = async (req, res, next) => {
   try {
     const { id } = req.params;
     
-    // Input validation
-    if (!id || isNaN(parseInt(id, 10))) {
+    if (!isUUID(id)) {
       throw new AppError('Invalid user ID', 400);
     }
 
     // Check if user is requesting their own profile or is an admin
-    if (req.user.id !== parseInt(id, 10) && req.user.role !== 'admin') {
+    if (req.user.id !== id && req.user.role !== 'admin') {
       throw new AppError('You do not have permission to view this user', 403);
     }
 
@@ -154,8 +156,7 @@ const updateUser = async (req, res, next) => {
     const { id } = req.params;
     const updates = { ...req.body };
     
-    // Input validation
-    if (!id || isNaN(parseInt(id, 10))) {
+    if (!isUUID(id)) {
       throw new AppError('Invalid user ID', 400);
     }
     
@@ -167,7 +168,7 @@ const updateUser = async (req, res, next) => {
     
     // Check permissions
     const isAdmin = req.user.role === 'admin';
-    const isSelf = req.user.id === parseInt(id, 10);
+    const isSelf = req.user.id === id;
     
     if (!isAdmin && !isSelf) {
       throw new AppError('You do not have permission to update this user', 403);
