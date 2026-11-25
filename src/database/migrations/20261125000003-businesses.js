@@ -108,7 +108,17 @@ module.exports = {
     await queryInterface.changeColumn('services', 'business_id', { ...businessRef, allowNull: false });
     await queryInterface.changeColumn('appointments', 'business_id', { ...businessRef, allowNull: false });
 
-    await queryInterface.removeConstraint('services', 'services_name_key');
+    // Repeated sync({ alter: true }) runs may have left several global unique constraints on name
+    const [nameConstraints] = await queryInterface.sequelize.query(`
+      SELECT c.conname
+      FROM pg_constraint c
+      JOIN pg_class t ON t.oid = c.conrelid
+      JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = 'name'
+      WHERE t.relname = 'services' AND c.contype = 'u' AND c.conkey = ARRAY[a.attnum]
+    `);
+    for (const { conname } of nameConstraints) {
+      await queryInterface.removeConstraint('services', conname);
+    }
     await queryInterface.addIndex('services', ['business_id', 'name'], {
       unique: true,
       name: 'services_business_name',
