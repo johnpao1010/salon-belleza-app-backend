@@ -66,12 +66,16 @@ const sendErrorProd = (err, res) => {
  * Global error handling middleware
  */
 const globalErrorHandler = (err, req, res, next) => {
+  if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
+    err.statusCode = 400;
+    err.status = 'fail';
+  }
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
-  } else if (process.env.NODE_ENV === 'production') {
+  } else {
     let error = { ...err };
     error.message = err.message;
 
