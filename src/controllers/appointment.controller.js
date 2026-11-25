@@ -1,6 +1,29 @@
-const { Appointment, Service, User } = require('../models');
+const { Appointment, Business, Service, User } = require('../models');
 const { Op, literal } = require('sequelize');
 const AppError = require('../utils/AppError');
+const { canManageBusiness, findMembership, isPlatformAdmin } = require('../middlewares/businessMiddleware');
+
+const toMinutes = (time) => {
+  const [hours, minutes] = String(time).split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+// Current wall-clock time in the given timezone, as a local Date (same convention as appointment dates)
+const nowInTimezone = (timeZone) => {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(new Date()).map((part) => [part.type, part.value])
+  );
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+};
 
 /**
  * Helper function to check if a time slot is available
@@ -31,16 +54,19 @@ const createAppointment = async (req, res, next) => {
     const { serviceId, employeeId, appointmentDate, startTime, notes } = req.body;
     const userId = req.user.id;
 
-    // Validate employee
-    const employee = await User.findByPk(employeeId);
-    if (!employee || !employee.is_active || employee.role !== 'employee') {
-      throw new AppError('Employee not found or not available', 404);
-    }
-
-    // Get the service to check duration and other details
     const service = await Service.findByPk(serviceId);
     if (!service || !service.is_active) {
       throw new AppError('Service not found or not available', 404);
+    }
+    const business = await Business.findOne({ where: { id: service.business_id, is_active: true } });
+    if (!business) {
+      throw new AppError('Business not found or not available', 404);
+    }
+
+    // The employee must be an active member of the service's business
+    const employee = await User.findByPk(employeeId);
+    if (!employee || !employee.is_active || !(await findMembership(employee.id, business.id))) {
+      throw new AppError('Employee not found or not available', 404);
     }
 
     // Parse and validate the appointment date and time
@@ -59,24 +85,22 @@ const createAppointment = async (req, res, next) => {
     const endDateTime = new Date(startDateTime.getTime() + service.duration * 60000);
     const end_time = `${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`;
 
-    // Check if the time slot is in the future
-    const now = new Date();
-    console.log('hora actual servidor (UTC)', now);
-    console.log('startDateTime', startDateTime);
-    
-    // Restar 5 horas para obtener hora local (UTC-5)
-    const localNow = new Date(now.getTime() - (5 * 60 * 60 * 1000));
-    console.log('hora actual local (UTC-5)', localNow);
-    
-    // Compare with local time
+    // Compare against the current wall-clock time of the business
+    const localNow = nowInTimezone(business.timezone);
     if (startDateTime <= localNow) {
       throw new AppError('Cannot book an appointment in the past', 400);
     }
 
     // Check if the time slot is within working hours (e.g., 9 AM to 7 PM)
-    const startHour = startDateTime.getHours();
-    if (startHour < 9 || startHour >= 19) {
-      throw new AppError('Appointments can only be scheduled between 9 AM and 7 PM', 400);
+    const startMinutesOfDay = startHours * 60 + startMinutes;
+    if (
+      startMinutesOfDay < toMinutes(business.opening_time)
+      || startMinutesOfDay + service.duration > toMinutes(business.closing_time)
+    ) {
+      throw new AppError(
+        `Appointments can only be scheduled between ${business.opening_time.slice(0, 5)} and ${business.closing_time.slice(0, 5)}`,
+        400
+      );
     }
 
     // Check if the time slot is available
@@ -93,6 +117,7 @@ const createAppointment = async (req, res, next) => {
 
     // Create the appointment
     const appointment = await Appointment.create({
+      business_id: business.id,
       user_id: userId,
       employee_id: employeeId,
       service_id: serviceId,
@@ -129,7 +154,7 @@ const createAppointment = async (req, res, next) => {
 const getAllAppointments = async (req, res, next) => {
   try {
     const { start_date, end_date, status, service_id, user_id } = req.query;
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = req.business ? await canManageBusiness(req.user, req.business.id) : isPlatformAdmin(req.user);
 
     const where = {};
     
@@ -155,6 +180,7 @@ const getAllAppointments = async (req, res, next) => {
     }
 
     // Non-admins can only see their own appointments
+    if (req.business) where.business_id = req.business.id;
     if (!isAdmin) {
       where.user_id = req.user.id;
     } else if (user_id) {
@@ -193,14 +219,7 @@ const getAllAppointments = async (req, res, next) => {
 const getAppointment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const isAdmin = req.user.role === 'admin';
-
     const where = { id };
-    
-    // Non-admins can only see their own appointments
-    if (!isAdmin) {
-      where.user_id = req.user.id;
-    }
 
     const appointment = await Appointment.findOne({
       where,
@@ -212,6 +231,13 @@ const getAppointment = async (req, res, next) => {
     });
 
     if (!appointment) {
+      throw new AppError('No appointment found with that ID', 404);
+    }
+
+    const canView = appointment.user_id === req.user.id
+      || appointment.employee_id === req.user.id
+      || (await canManageBusiness(req.user, appointment.business_id));
+    if (!canView) {
       throw new AppError('No appointment found with that ID', 404);
     }
 
@@ -233,7 +259,6 @@ const updateAppointment = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { service_id, employee_id, appointment_date, start_time, status, notes } = req.body;
-    const isAdmin = req.user.role === 'admin';
 
     // Find the appointment
     const appointment = await Appointment.findByPk(id, {
@@ -248,6 +273,8 @@ const updateAppointment = async (req, res, next) => {
       throw new AppError('No appointment found with that ID', 404);
     }
 
+    const isAdmin = await canManageBusiness(req.user, appointment.business_id);
+
     // Check permissions
     if (!isAdmin && appointment.user_id !== req.user.id) {
       throw new AppError('You do not have permission to update this appointment', 403);
@@ -256,7 +283,7 @@ const updateAppointment = async (req, res, next) => {
     // If updating employee, validate it
     if (employee_id) {
       const employee = await User.findByPk(employee_id);
-      if (!employee || !employee.is_active || employee.role !== 'employee') {
+      if (!employee || !employee.is_active || !(await findMembership(employee.id, appointment.business_id))) {
         throw new AppError('Employee not found or not available', 404);
       }
       appointment.employee_id = employee_id;
@@ -268,7 +295,7 @@ const updateAppointment = async (req, res, next) => {
         ? await Service.findByPk(service_id) 
         : await Service.findByPk(appointment.service_id);
 
-      if (!service || !service.is_active) {
+      if (!service || !service.is_active || service.business_id !== appointment.business_id) {
         throw new AppError('Service not found or not available', 404);
       }
 
@@ -341,13 +368,14 @@ const updateAppointment = async (req, res, next) => {
 const cancelAppointment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const isAdmin = req.user.role === 'admin';
 
     const appointment = await Appointment.findByPk(id);
 
     if (!appointment) {
       throw new AppError('No appointment found with that ID', 404);
     }
+
+    const isAdmin = await canManageBusiness(req.user, appointment.business_id);
 
     // Check permissions
     if (!isAdmin && appointment.user_id !== req.user.id) {
@@ -386,7 +414,7 @@ const getAvailableSlots = async (req, res, next) => {
     // Validate employee if provided
     if (employee_id) {
       const employee = await User.findByPk(employee_id);
-      if (!employee || !employee.is_active || employee.role !== 'employee') {
+      if (!employee || !employee.is_active) {
         throw new AppError('Employee not found or not available', 404);
       }
     }
@@ -395,6 +423,10 @@ const getAvailableSlots = async (req, res, next) => {
     const service = await Service.findByPk(service_id);
     if (!service || !service.is_active) {
       throw new AppError('Service not found or not available', 404);
+    }
+    const business = await Business.findByPk(service.business_id);
+    if (employee_id && !(await findMembership(employee_id, service.business_id))) {
+      throw new AppError('Employee not found or not available', 404);
     }
 
     // Parse the date
@@ -405,8 +437,8 @@ const getAvailableSlots = async (req, res, next) => {
 
     // Get working hours (9 AM to 7 PM)
     const workingHours = {
-      start: 9,  // 9 AM
-      end: 19,   // 7 PM
+      start: Number(String(business.opening_time).split(':')[0]),
+      end: Number(String(business.closing_time).split(':')[0]),
     };
 
     // Get all appointments for the service and employee on the given date
@@ -435,7 +467,7 @@ const getAvailableSlots = async (req, res, next) => {
     endTime.setHours(workingHours.end, 0, 0, 0);
 
     // Check if the current time is in the past for today
-    const now = new Date();
+    const now = nowInTimezone(business.timezone);
     if (appointmentDate.toDateString() === now.toDateString()) {
       // If the current time is later than the working hours start, start from the next available slot
       const currentHour = now.getHours();
@@ -514,7 +546,7 @@ const getAvailableSlots = async (req, res, next) => {
 const getEmployeeAppointments = async (req, res, next) => {
   try {
     const { employee_id, start_date, end_date, status } = req.query;
-    const isAdmin = req.user.role === 'admin';
+    const isAdmin = req.business ? await canManageBusiness(req.user, req.business.id) : isPlatformAdmin(req.user);
 
     if (!employee_id) {
       throw new AppError('Employee ID is required', 400);
@@ -522,12 +554,13 @@ const getEmployeeAppointments = async (req, res, next) => {
 
     // Validate that the employee exists and is actually an employee
     const employee = await User.findByPk(employee_id);
-    if (!employee || !employee.is_active || employee.role !== 'employee') {
+    if (!employee || !employee.is_active || (req.business && !(await findMembership(employee.id, req.business.id)))) {
       throw new AppError('Employee not found or not available', 404);
     }
 
     // Build where clause
     const where = { employee_id };
+    if (req.business) where.business_id = req.business.id;
 
     // Filter by date range
     if (start_date && end_date) {
@@ -546,7 +579,7 @@ const getEmployeeAppointments = async (req, res, next) => {
     }
 
     // Non-admins can only see their own appointments
-    if (!isAdmin && req.user.role === 'employee') {
+    if (!isAdmin) {
       // Employees can only see their own appointments
       if (employee_id !== req.user.id) {
         throw new AppError('You can only view your own appointments', 403);

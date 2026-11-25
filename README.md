@@ -90,3 +90,12 @@ src/
 ### Empleados/Estilistas
 - `GET /api/stylists`: Obtener todos los estilistas
 - `GET /api/stylists/:id`: Obtener un estilista específico
+
+## Establecimientos (multi-salón)
+
+Todos los salones comparten la misma base de datos. Cada servicio y cita tiene `business_id`, y los usuarios se asocian a un salón con `business_members` (`owner`, `admin` o `employee`). Los clientes son globales y pueden reservar en cualquier salón.
+
+- El salón activo se envía con el header `X-Business-Id` (o `?business_id=`). Si el usuario pertenece a un solo salón y no envía el header, se usa ese salón.
+- `users.role = 'admin'` queda como administrador de la plataforma y puede gestionar cualquier salón.
+- Endpoints: `GET /api/v1/businesses`, `GET /api/v1/businesses/:idOrSlug`, `GET /api/v1/businesses/mine`, `POST /api/v1/businesses` (quien lo crea queda como `owner`), `PATCH /api/v1/businesses/:id`, y `GET|POST /api/v1/businesses/:id/members`, `PATCH|DELETE /api/v1/businesses/:id/members/:userId`.
+- El horario (`opening_time`, `closing_time`) y la zona horaria (`timezone`) salen de cada salón.

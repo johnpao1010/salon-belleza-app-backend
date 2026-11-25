@@ -7,7 +7,7 @@ const AppError = require('../utils/AppError');
 const getAllServices = async (req, res, next) => {
   try {
     const services = await Service.findAll({
-      where: { is_active: true },
+      where: { business_id: req.business.id, is_active: true },
       order: [['name', 'ASC']],
     });
 
@@ -53,6 +53,7 @@ const createService = async (req, res, next) => {
     const { name, description, duration, price } = req.body;
 
     const service = await Service.create({
+      business_id: req.business.id,
       name,
       description,
       duration: parseInt(duration, 10),
@@ -77,7 +78,7 @@ const updateService = async (req, res, next) => {
   try {
     const { name, description, duration, price, is_active } = req.body;
 
-    const service = await Service.findByPk(req.params.id);
+    const service = await Service.findOne({ where: { id: req.params.id, business_id: req.business.id } });
 
     if (!service) {
       throw new AppError('No service found with that ID', 404);
@@ -107,7 +108,7 @@ const updateService = async (req, res, next) => {
  */
 const deleteService = async (req, res, next) => {
   try {
-    const service = await Service.findByPk(req.params.id);
+    const service = await Service.findOne({ where: { id: req.params.id, business_id: req.business.id } });
 
     if (!service) {
       throw new AppError('No service found with that ID', 404);

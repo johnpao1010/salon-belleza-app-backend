@@ -25,6 +25,7 @@ class User extends BaseModel {
   }
 
   static associate(models) {
+    this.hasMany(models.BusinessMember, { foreignKey: 'user_id', as: 'memberships' });
     this.hasMany(models.Appointment, {
       foreignKey: 'user_id',
       as: 'appointments',

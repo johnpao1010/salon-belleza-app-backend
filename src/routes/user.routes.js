@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/user.controller');
 const { authenticate, authorize } = require('../middlewares/authMiddleware');
+const { resolveBusiness } = require('../middlewares/businessMiddleware');
 
 // All routes require authentication
 router.use(authenticate);
@@ -12,7 +13,7 @@ router.patch('/profile', userController.updateUser);
 router.patch('/update-password', userController.updatePassword);
 
 // Get users by role (accessible by authenticated users)
-router.get('/by-role', userController.getUsersByRole);
+router.get('/by-role', resolveBusiness({ required: false }), userController.getUsersByRole);
 
 // Admin-only routes
 router.use(authorize('admin'));
