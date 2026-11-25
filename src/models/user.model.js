@@ -19,6 +19,10 @@ class User extends BaseModel {
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(user.password, salt);
           }
+          if (user.changed('email')) {
+            user.password_reset_token = null;
+            user.password_reset_expires = null;
+          }
         },
       },
     });
