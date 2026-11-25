@@ -245,6 +245,14 @@ const resetPassword = async (req, res, next) => {
       throw new AppError('El enlace no es válido o ya expiró. Solicita uno nuevo.', 400);
     }
 
+    const [claimed] = await User.update(
+      { password_reset_token: null, password_reset_expires: null },
+      { where: { id: user.id, password_reset_token: user.password_reset_token }, hooks: false }
+    );
+    if (!claimed) {
+      throw new AppError('El enlace no es válido o ya expiró. Solicita uno nuevo.', 400);
+    }
+
     user.password = password;
     user.password_reset_token = null;
     user.password_reset_expires = null;
