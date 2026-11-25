@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
-const { User } = require('../models');
+const { User, sequelize } = require('../models');
 const { generateToken } = require('../utils/jwt');
 const AppError = require('../utils/AppError');
 const emailService = require('../services/emailService');
@@ -245,18 +245,26 @@ const resetPassword = async (req, res, next) => {
       throw new AppError('El enlace no es válido o ya expiró. Solicita uno nuevo.', 400);
     }
 
-    const [claimed] = await User.update(
-      { password_reset_token: null, password_reset_expires: null },
-      { where: { id: user.id, password_reset_token: user.password_reset_token }, hooks: false }
-    );
-    if (!claimed) {
-      throw new AppError('El enlace no es válido o ya expiró. Solicita uno nuevo.', 400);
-    }
+    // Claim the token and save in one transaction: a concurrent request finds it already
+    // claimed, and a rejected password rolls the claim back so the link can be retried.
+    await sequelize.transaction(async (transaction) => {
+      const [claimed] = await User.update(
+        { password_reset_token: null, password_reset_expires: null },
+        {
+          where: { id: user.id, password_reset_token: user.password_reset_token },
+          hooks: false,
+          transaction,
+        }
+      );
+      if (!claimed) {
+        throw new AppError('El enlace no es válido o ya expiró. Solicita uno nuevo.', 400);
+      }
 
-    user.password = password;
-    user.password_reset_token = null;
-    user.password_reset_expires = null;
-    await user.save();
+      user.password = password;
+      user.password_reset_token = null;
+      user.password_reset_expires = null;
+      await user.save({ transaction });
+    });
 
     res.status(200).json({
       status: 'success',
