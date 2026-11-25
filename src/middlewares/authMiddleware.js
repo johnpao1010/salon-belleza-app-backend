@@ -39,6 +39,14 @@ const authenticate = async (req, res, next) => {
       });
     }
 
+    const passwordChangedAt = user.password_changed_at?.getTime();
+    if (passwordChangedAt && decoded.iat < Math.floor(passwordChangedAt / 1000)) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired, please log in again'
+      });
+    }
+
     // Attach user to request object
     req.user = user;
     next();

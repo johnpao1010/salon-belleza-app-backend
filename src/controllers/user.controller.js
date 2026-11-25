@@ -194,6 +194,7 @@ const updateUser = async (req, res, next) => {
       password,
       password_reset_token,
       password_reset_expires,
+      password_changed_at,
       ...updateData
     } = updates;
 

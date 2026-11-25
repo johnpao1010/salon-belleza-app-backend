@@ -7,7 +7,7 @@ const emailService = require('../services/emailService');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 const RESET_EMAIL_COOLDOWN_MS = 60 * 1000;
-const PRIVATE_USER_FIELDS = ['password', 'password_reset_token', 'password_reset_expires'];
+const PRIVATE_USER_FIELDS = ['password', 'password_reset_token', 'password_reset_expires', 'password_changed_at'];
 
 const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
