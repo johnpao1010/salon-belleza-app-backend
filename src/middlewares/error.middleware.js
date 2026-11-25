@@ -47,14 +47,16 @@ const sendErrorDev = (err, res) => {
  */
 const sendErrorProd = (err, res) => {
   // Operational, trusted error: send message to client
-  if (err.isOperational) {
+  // http-errors (e.g. malformed or oversized JSON bodies) mark client errors with `expose`
+  if (err.isOperational || (err.expose && err.statusCode < 500)) {
     res.status(err.statusCode).json({
       status: err.status,
       message: err.message,
     });
   } else {
     // Programming or other unknown error: don't leak error details
-    console.error('ERROR 💥', err);
+    // Log without the error object itself: parser errors carry the raw request body
+    console.error('ERROR 💥', err.name, err.message, err.stack);
     res.status(500).json({
       status: 'error',
       message: 'Something went very wrong!',
@@ -76,8 +78,7 @@ const globalErrorHandler = (err, req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(err, res);
   } else {
-    let error = { ...err };
-    error.message = err.message;
+    let error = { ...err, name: err.name, message: err.message, stack: err.stack };
 
     // Handle specific error types
     if (error.name === 'JsonWebTokenError') error = handleJWTError();
