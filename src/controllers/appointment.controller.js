@@ -310,6 +310,18 @@ const updateAppointment = async (req, res, next) => {
       const endDateTime = new Date(startDateTime.getTime() + service.duration * 60000);
       const endTime = `${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`;
 
+      const business = await Business.findByPk(appointment.business_id);
+      const startMinutesOfDay = hours * 60 + minutes;
+      if (
+        startMinutesOfDay < toMinutes(business.opening_time)
+        || startMinutesOfDay + service.duration > toMinutes(business.closing_time)
+      ) {
+        throw new AppError(
+          `Appointments can only be scheduled between ${business.opening_time.slice(0, 5)} and ${business.closing_time.slice(0, 5)}`,
+          400
+        );
+      }
+
       // Check if the time slot is available (excluding the current appointment)
       const isAvailable = await isTimeSlotAvailable(
         currentEmployeeId,
