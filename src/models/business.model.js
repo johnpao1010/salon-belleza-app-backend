@@ -31,7 +31,20 @@ class Business extends BaseModel {
       phone: { type: DataTypes.STRING, allowNull: true },
       email: { type: DataTypes.STRING, allowNull: true, validate: { isEmail: true } },
       logo_url: { type: DataTypes.STRING, allowNull: true },
-      timezone: { type: DataTypes.STRING, allowNull: false, defaultValue: 'America/Bogota' },
+      timezone: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: 'America/Bogota',
+        validate: {
+          isValidTimezone(value) {
+            try {
+              new Intl.DateTimeFormat('en-US', { timeZone: value });
+            } catch (error) {
+              throw new Error('Invalid timezone');
+            }
+          },
+        },
+      },
       opening_time: { type: DataTypes.TIME, allowNull: false, defaultValue: '09:00' },
       closing_time: { type: DataTypes.TIME, allowNull: false, defaultValue: '19:00' },
       is_active: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
