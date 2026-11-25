@@ -42,6 +42,8 @@ JWT_EXPIRATION=24h
 
 `JWT_SECRET` es obligatorio: el servidor no arranca sin él.
 
+Para recuperar la contraseña se envía un enlace por correo (SendGrid) que vence en 1 hora y sirve una sola vez. Requiere `SENDGRID_API_KEY`, `EMAIL_FROM` y `FRONTEND_URL`, la URL pública del panel web (por ejemplo `https://estilistafront.onrender.com`).
+
 4. Iniciar el servidor
 ```
 npm run dev

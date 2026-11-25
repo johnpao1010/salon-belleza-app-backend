@@ -1,7 +1,21 @@
+const crypto = require('crypto');
+const { Op } = require('sequelize');
 const { User } = require('../models');
 const { generateToken } = require('../utils/jwt');
 const AppError = require('../utils/AppError');
 const emailService = require('../services/emailService');
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
+const RESET_EMAIL_COOLDOWN_MS = 60 * 1000;
+const PRIVATE_USER_FIELDS = ['password', 'password_reset_token', 'password_reset_expires'];
+
+const hashResetToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
+
+const toUserResponse = (user) => {
+  const userResponse = user.get({ plain: true });
+  PRIVATE_USER_FIELDS.forEach((field) => delete userResponse[field]);
+  return userResponse;
+};
 
 /**
  * Register a new user
@@ -32,9 +46,7 @@ const register = async (req, res, next) => {
     // Generate JWT token
     const token = generateToken(user.id, user.role);
 
-    // Remove password from response
-    const userResponse = user.get({ plain: true });
-    delete userResponse.password;
+    const userResponse = toUserResponse(user);
 
     // Send welcome email for 'user' role
     if (user.role === 'user') {
@@ -90,9 +102,8 @@ const login = async (req, res, next) => {
     // 5) Generate JWT token
     const token = generateToken(user.id, user.role);
 
-    // 6) Remove password from output
-    const userResponse = user.get({ plain: true });
-    delete userResponse.password;
+    // 6) Remove private fields from output
+    const userResponse = toUserResponse(user);
 
     // 7) Send response
     res.status(200).json({
@@ -116,7 +127,7 @@ const login = async (req, res, next) => {
 const getMe = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.id, {
-      attributes: { exclude: ['password'] },
+      attributes: { exclude: PRIVATE_USER_FIELDS },
     });
 
     if (!user) {
@@ -172,8 +183,85 @@ const updatePassword = async (req, res, next) => {
   }
 };
 
+/**
+ * Send a single-use password reset link. Always answers the same way so the
+ * response does not reveal whether an account exists.
+ */
+const forgotPassword = async (req, res, next) => {
+  try {
+    const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+    if (!email) {
+      throw new AppError('Por favor ingresa tu correo electrónico', 400);
+    }
+
+    const user = await User.findOne({ where: { email, is_active: true } });
+    const now = Date.now();
+    const recentlySent =
+      user?.password_reset_expires &&
+      user.password_reset_expires.getTime() - RESET_TOKEN_TTL_MS > now - RESET_EMAIL_COOLDOWN_MS;
+
+    if (user && !recentlySent) {
+      if (!process.env.FRONTEND_URL) {
+        console.error('FRONTEND_URL is not set; cannot send password reset link');
+      } else {
+        const token = crypto.randomBytes(32).toString('hex');
+        user.password_reset_token = hashResetToken(token);
+        user.password_reset_expires = new Date(now + RESET_TOKEN_TTL_MS);
+        await user.save({ hooks: false });
+
+        const resetUrl = `${process.env.FRONTEND_URL.replace(/\/+$/, '')}/#/reset-password?token=${token}`;
+        await emailService.sendPasswordResetEmail(user, resetUrl);
+      }
+    }
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Set a new password using a valid, unexpired reset token
+ */
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    if (typeof token !== 'string' || !token || typeof password !== 'string' || !password) {
+      throw new AppError('Token y nueva contraseña son obligatorios', 400);
+    }
+
+    const user = await User.findOne({
+      where: {
+        password_reset_token: hashResetToken(token),
+        password_reset_expires: { [Op.gt]: new Date() },
+        is_active: true,
+      },
+    });
+    if (!user) {
+      throw new AppError('El enlace no es válido o ya expiró. Solicita uno nuevo.', 400);
+    }
+
+    user.password = password;
+    user.password_reset_token = null;
+    user.password_reset_expires = null;
+    await user.save();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Tu contraseña fue actualizada correctamente.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
+  forgotPassword,
+  resetPassword,
   login,
   getMe,
   updatePassword,
