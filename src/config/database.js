@@ -51,20 +51,7 @@ const testConnection = async () => {
   }
 };
 
-// Sync all models with the database
-const syncModels = async () => {
-  try {
-    // In development, you might want to use { force: true } to drop tables and re-create them
-    // In production, use { alter: true } to update tables without dropping them
-    await sequelize.sync({ alter: true });
-    console.log('All models were synchronized successfully.');
-  } catch (error) {
-    console.error('Error synchronizing models:', error);
-  }
-};
-
 module.exports = {
   sequelize,
   testConnection,
-  syncModels
 };

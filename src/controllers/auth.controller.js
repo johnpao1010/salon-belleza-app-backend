@@ -11,7 +11,7 @@ const emailService = require('../services/emailService');
  */
 const register = async (req, res, next) => {
   try {
-    const { first_name, last_name, email, password, phone, role = 'user' } = req.body;
+    const { first_name, last_name, email, password, phone } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
@@ -26,7 +26,7 @@ const register = async (req, res, next) => {
       email,
       password,
       phone,
-      role: role || 'user', // Use role from request or default to 'user'
+      role: 'user',
     });
 
     // Generate JWT token

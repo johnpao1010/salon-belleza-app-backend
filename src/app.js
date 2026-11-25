@@ -9,8 +9,14 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: path.join(__dirname, '../.env') });
 }
 
+if (!process.env.JWT_SECRET) {
+  console.error('JWT_SECRET is not set. Refusing to start.');
+  process.exit(1);
+}
+
 // Import database connection and models
-const { sequelize, testConnection, syncModels } = require('./config/database');
+const { testConnection } = require('./config/database');
+const { runMigrations } = require('./database/migrator');
 
 // Import routes
 const authRoutes = require('./routes/auth.routes');
@@ -50,9 +56,9 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-// Test database connection and sync models
+// Test database connection and apply pending migrations
 testConnection()
-  .then(() => syncModels())
+  .then(() => runMigrations())
   .catch((err) => {
     console.error('Failed to connect to the database:', err);
     process.exit(1);

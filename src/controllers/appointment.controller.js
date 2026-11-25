@@ -5,24 +5,14 @@ const AppError = require('../utils/AppError');
 /**
  * Helper function to check if a time slot is available
  */
-const isTimeSlotAvailable = async (serviceId, employeeId, date, startTime, endTime, excludeAppointmentId = null) => {
+const isTimeSlotAvailable = async (employeeId, date, startTime, endTime, excludeAppointmentId = null) => {
+  // An employee cannot have overlapping scheduled appointments, whatever the service
   const conditions = {
-    service_id: serviceId,
     employee_id: employeeId,
     appointment_date: date,
     status: 'scheduled',
-    [Op.or]: [
-      // New appointment starts during an existing appointment
-      {
-        start_time: { [Op.lt]: endTime },
-        end_time: { [Op.gt]: startTime },
-      },
-      // New appointment ends during an existing appointment
-      {
-        start_time: { [Op.lt]: endTime },
-        end_time: { [Op.gt]: startTime },
-      },
-    ],
+    start_time: { [Op.lt]: endTime },
+    end_time: { [Op.gt]: startTime },
   };
 
   if (excludeAppointmentId) {
@@ -91,7 +81,6 @@ const createAppointment = async (req, res, next) => {
 
     // Check if the time slot is available
     const isAvailable = await isTimeSlotAvailable(
-      serviceId,
       employeeId,
       appointment_Date,
       startTime,
@@ -296,7 +285,6 @@ const updateAppointment = async (req, res, next) => {
 
       // Check if the time slot is available (excluding the current appointment)
       const isAvailable = await isTimeSlotAvailable(
-        service.id,
         currentEmployeeId,
         date,
         startTime,
@@ -479,7 +467,6 @@ const getAvailableSlots = async (req, res, next) => {
 
       // Check if the slot is available
       const isAvailable = await isTimeSlotAvailable(
-        service_id,
         employee_id,
         date,
         slot.start_time,

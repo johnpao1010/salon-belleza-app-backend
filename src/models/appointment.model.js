@@ -9,8 +9,9 @@ class Appointment extends BaseModel {
       indexes: [
         {
           unique: true,
-          fields: ['service_id', 'appointment_date', 'start_time'],
-          name: 'unique_booking_slot',
+          fields: ['employee_id', 'appointment_date', 'start_time'],
+          name: 'unique_employee_booking_slot',
+          where: { status: 'scheduled', deleted_at: null },
         },
       ],
     });

@@ -40,10 +40,23 @@ JWT_SECRET=tu_secreto_jwt
 JWT_EXPIRATION=24h
 ```
 
+`JWT_SECRET` es obligatorio: el servidor no arranca sin él.
+
 4. Iniciar el servidor
 ```
 npm run dev
 ```
+Al arrancar se aplican las migraciones pendientes de `src/database/migrations`.
+
+## Migraciones
+
+El esquema se maneja con migraciones (Umzug, formato sequelize-cli), no con `sequelize.sync`.
+```
+npm run migrate          # aplica migraciones pendientes
+npm run migrate:undo     # revierte la última
+npm run migrate:status   # lista ejecutadas y pendientes
+```
+Para un cambio de esquema, agrega un archivo `src/database/migrations/YYYYMMDDHHMMSS-descripcion.js` con `up(queryInterface, Sequelize)` y `down(...)`.
 
 ## Estructura del Proyecto
 
