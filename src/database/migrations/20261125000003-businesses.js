@@ -113,6 +113,7 @@ module.exports = {
       SELECT c.conname
       FROM pg_constraint c
       JOIN pg_class t ON t.oid = c.conrelid
+      JOIN pg_namespace n ON n.oid = t.relnamespace AND n.nspname = current_schema()
       JOIN pg_attribute a ON a.attrelid = t.oid AND a.attname = 'name'
       WHERE t.relname = 'services' AND c.contype = 'u' AND c.conkey = ARRAY[a.attnum]
     `);
