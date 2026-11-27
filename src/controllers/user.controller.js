@@ -1,5 +1,6 @@
 const { BusinessMember, User } = require('../models');
 const AppError = require('../utils/AppError');
+const { isPlatformAdmin } = require('../middlewares/businessMiddleware');
 const { Op } = require('sequelize');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -391,6 +392,11 @@ const getUsersByRole = async (req, res, next) => {
 
     if (!role) {
       throw new AppError('Role parameter is required', 400);
+    }
+
+    // Exposes emails and phones: only salon members (or platform admins) may list users
+    if (!isPlatformAdmin(req.user) && !req.membership) {
+      throw new AppError('You do not have permission to list users', 403);
     }
 
     // Build where clause

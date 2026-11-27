@@ -9,6 +9,7 @@ const manage = [loadBusinessFromParam, requireBusinessRole('owner', 'admin')];
 router.get('/', businessController.listBusinesses);
 router.get('/mine', authenticate, businessController.getMyBusinesses);
 router.get('/:idOrSlug', businessController.getBusiness);
+router.get('/:idOrSlug/employees', businessController.listEmployees);
 
 router.use(authenticate);
 
