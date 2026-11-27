@@ -56,6 +56,32 @@ const getBusiness = async (req, res, next) => {
   }
 };
 
+// Public list of a business's stylists, with only what a client needs to pick one
+const listEmployees = async (req, res, next) => {
+  try {
+    const { idOrSlug } = req.params;
+    const where = UUID_REGEX.test(idOrSlug) ? { id: idOrSlug } : { slug: idOrSlug };
+    const business = await Business.findOne({ where: { ...where, is_active: true }, attributes: ['id'] });
+    if (!business) throw new AppError('Business not found', 404);
+
+    const members = await BusinessMember.findAll({
+      where: { business_id: business.id, role: 'employee', is_active: true },
+      attributes: [],
+      include: [{
+        model: User,
+        as: 'user',
+        where: { is_active: true },
+        attributes: ['id', 'first_name', 'last_name'],
+      }],
+      order: [[{ model: User, as: 'user' }, 'first_name', 'ASC']],
+    });
+    const employees = members.map((member) => member.user);
+    res.status(200).json({ status: 'success', results: employees.length, data: { employees } });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getMyBusinesses = async (req, res, next) => {
   try {
     const memberships = await BusinessMember.findAll({
@@ -207,6 +233,7 @@ module.exports = {
   listBusinesses,
   getBusiness,
   getMyBusinesses,
+  listEmployees,
   createBusiness,
   updateBusiness,
   listMembers,

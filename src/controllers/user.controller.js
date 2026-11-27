@@ -1,5 +1,6 @@
-const { BusinessMember, User } = require('../models');
+const { Appointment, BusinessMember, User } = require('../models');
 const AppError = require('../utils/AppError');
+const { isPlatformAdmin } = require('../middlewares/businessMiddleware');
 const { Op } = require('sequelize');
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -393,6 +394,11 @@ const getUsersByRole = async (req, res, next) => {
       throw new AppError('Role parameter is required', 400);
     }
 
+    // Exposes emails and phones: only salon members (or platform admins) may list users
+    if (!isPlatformAdmin(req.user) && !req.membership) {
+      throw new AppError('You do not have permission to list users', 403);
+    }
+
     // Build where clause
     const where = { role };
 
@@ -420,6 +426,15 @@ const getUsersByRole = async (req, res, next) => {
         where: { business_id: req.business.id, is_active: true, role },
         attributes: ['role'],
       });
+    } else if (!isPlatformAdmin(req.user)) {
+      // Salon staff only see customers who have booked at their salon
+      const clients = await Appointment.findAll({
+        where: { business_id: req.business.id },
+        attributes: ['user_id'],
+        group: ['user_id'],
+        raw: true,
+      });
+      where.id = { [Op.in]: clients.map((client) => client.user_id) };
     }
 
     const users = await User.findAll({
