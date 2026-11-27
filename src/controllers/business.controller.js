@@ -2,6 +2,7 @@ const { randomBytes } = require('crypto');
 const { Op } = require('sequelize');
 const { Business, BusinessMember, User, sequelize } = require('../models');
 const AppError = require('../utils/AppError');
+const { normalizeEmail } = require('../utils/email');
 
 const PUBLIC_ATTRIBUTES = [
   'id', 'name', 'slug', 'address', 'phone', 'email', 'logo_url',
@@ -173,7 +174,8 @@ const assertCanAssignRole = (req, role) => {
 
 const addMember = async (req, res, next) => {
   try {
-    const { email, role = 'employee' } = req.body;
+    const { role = 'employee' } = req.body;
+    const email = normalizeEmail(req.body.email);
     if (!['owner', 'admin', 'employee'].includes(role)) throw new AppError('Invalid role', 400);
     assertCanAssignRole(req, role);
 
