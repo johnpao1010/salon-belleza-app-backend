@@ -1,5 +1,6 @@
 const { Appointment, BusinessMember, User } = require('../models');
 const AppError = require('../utils/AppError');
+const { normalizeEmail } = require('../utils/email');
 const { isPlatformAdmin } = require('../middlewares/businessMiddleware');
 const { Op } = require('sequelize');
 
@@ -183,6 +184,7 @@ const updateUser = async (req, res, next) => {
     }
     
     // Check if email is being updated and if it's already in use
+    if (updates.email) updates.email = normalizeEmail(updates.email);
     if (updates.email && updates.email !== user.email) {
       const emailExists = await User.findOne({ where: { email: updates.email } });
       if (emailExists) {

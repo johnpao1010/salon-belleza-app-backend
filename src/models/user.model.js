@@ -1,6 +1,7 @@
 const { DataTypes } = require('sequelize');
 const bcrypt = require('bcrypt');
 const BaseModel = require('./base.model');
+const { normalizeEmail } = require('../utils/email');
 
 class User extends BaseModel {
   static init(sequelize) {
@@ -71,6 +72,9 @@ class User extends BaseModel {
         type: DataTypes.STRING,
         allowNull: false,
         unique: true,
+        set(value) {
+          this.setDataValue('email', normalizeEmail(value));
+        },
         validate: {
           isEmail: true,
           notEmpty: true,

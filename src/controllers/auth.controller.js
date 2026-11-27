@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const { User, sequelize } = require('../models');
 const { generateToken } = require('../utils/jwt');
 const AppError = require('../utils/AppError');
+const { normalizeEmail } = require('../utils/email');
 const emailService = require('../services/emailService');
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -25,7 +26,8 @@ const toUserResponse = (user) => {
  */
 const register = async (req, res, next) => {
   try {
-    const { first_name, last_name, email, password, phone } = req.body;
+    const { first_name, last_name, password, phone } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     // Check if user already exists
     const existingUser = await User.findOne({ where: { email } });
@@ -76,7 +78,8 @@ const register = async (req, res, next) => {
  */
 const login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     // 1) Check if email and password exist
     if (!email || !password) {
@@ -189,7 +192,7 @@ const updatePassword = async (req, res, next) => {
  */
 const forgotPassword = async (req, res, next) => {
   try {
-    const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
+    const email = typeof req.body.email === 'string' ? normalizeEmail(req.body.email) : '';
     if (!email) {
       throw new AppError('Por favor ingresa tu correo electrónico', 400);
     }
