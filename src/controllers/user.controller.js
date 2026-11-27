@@ -1,4 +1,4 @@
-const { BusinessMember, User } = require('../models');
+const { Appointment, BusinessMember, User } = require('../models');
 const AppError = require('../utils/AppError');
 const { isPlatformAdmin } = require('../middlewares/businessMiddleware');
 const { Op } = require('sequelize');
@@ -426,6 +426,15 @@ const getUsersByRole = async (req, res, next) => {
         where: { business_id: req.business.id, is_active: true, role },
         attributes: ['role'],
       });
+    } else if (!isPlatformAdmin(req.user)) {
+      // Salon staff only see customers who have booked at their salon
+      const clients = await Appointment.findAll({
+        where: { business_id: req.business.id },
+        attributes: ['user_id'],
+        group: ['user_id'],
+        raw: true,
+      });
+      where.id = { [Op.in]: clients.map((client) => client.user_id) };
     }
 
     const users = await User.findAll({
