@@ -486,7 +486,7 @@ const getAvailableSlots = async (req, res, next) => {
     const now = nowInTimezone(business.timezone);
     const pad = (n) => String(n).padStart(2, '0');
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    if (date === today) {
+    if (String(date).slice(0, 10) === today) {
       const openingMinutes = workingHours.start * 60;
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
       if (nowMinutes >= openingMinutes) {
