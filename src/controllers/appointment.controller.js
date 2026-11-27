@@ -179,9 +179,13 @@ const getAllAppointments = async (req, res, next) => {
       where.service_id = service_id;
     }
 
+    // mine=true lists the user's own bookings across salons, unless a salon is explicitly requested
+    const mine = req.query.mine === 'true';
+    const explicitBusiness = req.headers['x-business-id'] || req.query.business_id;
+    if (req.business && (!mine || explicitBusiness)) where.business_id = req.business.id;
+
     // Non-admins can only see their own appointments
-    if (req.business) where.business_id = req.business.id;
-    if (!isAdmin) {
+    if (mine || !isAdmin) {
       where.user_id = req.user.id;
     } else if (user_id) {
       // Admins can filter by user_id
@@ -478,17 +482,16 @@ const getAvailableSlots = async (req, res, next) => {
     const endTime = new Date(appointmentDate);
     endTime.setHours(workingHours.end, 0, 0, 0);
 
-    // Check if the current time is in the past for today
+    // For today, start at the first slot (on the grid from opening time) that hasn't started yet
     const now = nowInTimezone(business.timezone);
-    if (appointmentDate.toDateString() === now.toDateString()) {
-      // If the current time is later than the working hours start, start from the next available slot
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      
-      if (currentHour > workingHours.start || (currentHour === workingHours.start && currentMinute >= 0)) {
-        // Round up to the next slot
-        const minutesToAdd = slotDuration - (currentMinute % slotDuration);
-        currentTime.setMinutes(currentMinute + minutesToAdd);
+    const pad = (n) => String(n).padStart(2, '0');
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    if (String(date).slice(0, 10) === today) {
+      const openingMinutes = workingHours.start * 60;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      if (nowMinutes >= openingMinutes) {
+        const elapsedSlots = Math.floor((nowMinutes - openingMinutes) / slotDuration) + 1;
+        currentTime.setHours(0, openingMinutes + elapsedSlots * slotDuration, 0, 0);
       }
     }
 
